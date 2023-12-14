@@ -161,15 +161,14 @@ impl egui_ash::AppCreator for MyAppCreator {
 }
 
 // (7) Call `egui_ash::run` with `AppCreator` struct.
-fn main() -> anyhow::Result<()> {
+fn main() {
     egui_ash::run(
         MyAppCreator,
         RunOption {
             viewport_builder: Some(egui::ViewportBuilder::default().with_title("egui-ash")),
             ..Default::default()
         },
-    )?;
-    Ok(())
+    )
 }
 ```
 
