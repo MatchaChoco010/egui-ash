@@ -1,6 +1,6 @@
 [package]
 name = "egui-ash"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["ORITO Itsuki <orito.itsuki@gmail.com>"]
 description = "egui integration for ash (Vulkan)."
 edition = "2021"
