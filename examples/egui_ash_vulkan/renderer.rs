@@ -11,6 +11,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+macro_rules! include_spirv {
+    ($file:literal) => {{
+        let bytes = include_bytes!($file);
+        bytes
+            .chunks_exact(4)
+            .map(|x| x.try_into().unwrap())
+            .map(match bytes[0] {
+                0x03 => u32::from_le_bytes,
+                0x07 => u32::from_be_bytes,
+                _ => panic!("Unknown endianness"),
+            })
+            .collect::<Vec<u32>>()
+    }};
+}
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 struct Vertex {
@@ -467,9 +482,8 @@ impl RendererInner {
         render_pass: vk::RenderPass,
     ) -> (vk::Pipeline, vk::PipelineLayout) {
         let vertex_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/vert.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/vert.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
@@ -477,9 +491,8 @@ impl RendererInner {
             }
         };
         let fragment_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/frag.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/frag.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
@@ -1166,18 +1179,22 @@ impl RendererInner {
             self.device.cmd_set_viewport(
                 self.command_buffers[self.current_frame],
                 0,
-                std::slice::from_ref(&vk::Viewport::builder()
-                    .width(width as f32)
-                    .height(height as f32)
-                    .min_depth(0.0)
-                    .max_depth(1.0)),
+                std::slice::from_ref(
+                    &vk::Viewport::builder()
+                        .width(width as f32)
+                        .height(height as f32)
+                        .min_depth(0.0)
+                        .max_depth(1.0),
+                ),
             );
             self.device.cmd_set_scissor(
                 self.command_buffers[self.current_frame],
                 0,
-                std::slice::from_ref(&vk::Rect2D::builder()
-                    .offset(vk::Offset2D::builder().build())
-                    .extent(self.surface_extent)),
+                std::slice::from_ref(
+                    &vk::Rect2D::builder()
+                        .offset(vk::Offset2D::builder().build())
+                        .extent(self.surface_extent),
+                ),
             );
             self.device.cmd_bind_descriptor_sets(
                 self.command_buffers[self.current_frame],

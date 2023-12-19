@@ -11,6 +11,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+macro_rules! include_spirv {
+    ($file:literal) => {{
+        let bytes = include_bytes!($file);
+        bytes
+            .chunks_exact(4)
+            .map(|x| x.try_into().unwrap())
+            .map(match bytes[0] {
+                0x03 => u32::from_le_bytes,
+                0x07 => u32::from_be_bytes,
+                _ => panic!("Unknown endianness"),
+            })
+            .collect::<Vec<u32>>()
+    }};
+}
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 struct Vertex {
@@ -467,9 +482,8 @@ impl ModelRendererInner {
         render_pass: vk::RenderPass,
     ) -> (vk::Pipeline, vk::PipelineLayout) {
         let vertex_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/model.vert.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/model.vert.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
@@ -477,9 +491,8 @@ impl ModelRendererInner {
             }
         };
         let fragment_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/model.frag.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/model.frag.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
