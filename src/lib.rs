@@ -19,5 +19,3 @@ pub use run::*;
 
 #[cfg(feature = "gpu-allocator")]
 mod gpu_allocator;
-#[cfg(feature = "gpu-allocator")]
-pub use crate::gpu_allocator::*;

@@ -18,14 +18,14 @@ use std::{
 };
 
 struct MyApp {
-    entry: Arc<Entry>,
-    instance: Arc<Instance>,
-    device: Arc<Device>,
+    entry: Entry,
+    instance: Instance,
+    device: Device,
     debug_utils_loader: DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
     physical_device: vk::PhysicalDevice,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    surface_loader: Surface,
+    swapchain_loader: Swapchain,
     surface: vk::SurfaceKHR,
     queue: vk::Queue,
     command_pool: vk::CommandPool,
@@ -674,14 +674,14 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
         let texture_id = cc.image_registry.register_user_texture(image_view, sampler);
 
         let app = MyApp {
-            entry: Arc::new(entry),
-            instance: Arc::new(instance),
-            device: Arc::new(device),
+            entry,
+            instance,
+            device,
             debug_utils_loader: debug_utils_loader,
             debug_messenger,
             physical_device,
-            surface_loader: Arc::new(surface_loader),
-            swapchain_loader: Arc::new(swapchain_loader),
+            surface_loader,
+            swapchain_loader,
             surface,
             queue,
             command_pool,

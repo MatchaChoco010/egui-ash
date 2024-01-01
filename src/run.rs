@@ -156,94 +156,93 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
         run_option.persistent_egui_memory,
     ));
 
-    event_loop.run(move |event, event_loop, control_flow| match event {
-        winit::event::Event::NewEvents(start_cause) => {
-            match start_cause {
-                winit::event::StartCause::ResumeTimeReached { .. } => {
-                    integration.paint_all(event_loop, control_flow, &mut app);
-                }
-                _ => (),
+    event_loop.run(move |event, event_loop, control_flow| {
+        control_flow.set_poll();
+        match event {
+            winit::event::Event::NewEvents(start_cause) => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::NewEvents(start_cause),
+                };
+                app.handle_event(app_event);
             }
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::NewEvents(start_cause),
-            };
-            app.handle_event(app_event);
-        }
-        winit::event::Event::WindowEvent {
-            event, window_id, ..
-        } => {
-            let consumed = integration.handle_window_event(
-                window_id,
-                &event,
-                control_flow,
-                run_option.follow_system_theme,
-            );
-            if consumed {
-                return;
-            }
-
-            let Some(viewport_id) = integration.viewport_id_from_window_id(window_id) else {
-                return;
-            };
-            let viewport_event = event::Event::ViewportEvent { viewport_id, event };
-            app.handle_event(viewport_event);
-        }
-        winit::event::Event::DeviceEvent { device_id, event } => {
-            let device_event = event::Event::DeviceEvent { device_id, event };
-            app.handle_event(device_event);
-        }
-        #[allow(unused_variables)] // only used when accesskit feature is enabled
-        winit::event::Event::UserEvent(integration_event) => {
-            #[cfg(feature = "accesskit")]
-            {
-                integration.handle_accesskit_event(
-                    &integration_event.accesskit,
-                    event_loop,
+            winit::event::Event::WindowEvent {
+                event, window_id, ..
+            } => {
+                let consumed = integration.handle_window_event(
+                    window_id,
+                    &event,
                     control_flow,
-                    &mut app,
+                    run_option.follow_system_theme,
                 );
-                let user_event = event::Event::AccessKitActionRequest(integration_event.accesskit);
-                app.handle_event(user_event);
+                if consumed {
+                    return;
+                }
+
+                let Some(viewport_id) = integration.viewport_id_from_window_id(window_id) else {
+                    return;
+                };
+                let viewport_event = event::Event::ViewportEvent { viewport_id, event };
+                app.handle_event(viewport_event);
             }
-        }
-        winit::event::Event::Suspended => {
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::Suspended,
-            };
-            app.handle_event(app_event);
-        }
-        winit::event::Event::Resumed => {
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::Resumed,
-            };
-            app.handle_event(app_event);
-            integration.paint_all(event_loop, control_flow, &mut app);
-        }
-        winit::event::Event::MainEventsCleared => {
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::MainEventsCleared,
-            };
-            app.handle_event(app_event);
-        }
-        winit::event::Event::RedrawRequested(window_id) => {
-            integration.paint(event_loop, control_flow, window_id, &mut app);
-        }
-        winit::event::Event::RedrawEventsCleared => {
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::RedrawEventsCleared,
-            };
-            app.handle_event(app_event);
-        }
-        winit::event::Event::LoopDestroyed => {
-            let app_event = event::Event::AppEvent {
-                event: event::AppEvent::LoopDestroyed,
-            };
-            app.handle_event(app_event);
-            #[cfg(feature = "persistence")]
-            integration.save(&mut app);
-            integration.destroy();
-            unsafe {
-                ManuallyDrop::drop(&mut integration);
+            winit::event::Event::DeviceEvent { device_id, event } => {
+                let device_event = event::Event::DeviceEvent { device_id, event };
+                app.handle_event(device_event);
+            }
+            #[allow(unused_variables)] // only used when accesskit feature is enabled
+            winit::event::Event::UserEvent(integration_event) => {
+                #[cfg(feature = "accesskit")]
+                {
+                    integration.handle_accesskit_event(
+                        &integration_event.accesskit,
+                        event_loop,
+                        control_flow,
+                        &mut app,
+                    );
+                    let user_event =
+                        event::Event::AccessKitActionRequest(integration_event.accesskit);
+                    app.handle_event(user_event);
+                }
+            }
+            winit::event::Event::Suspended => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::Suspended,
+                };
+                app.handle_event(app_event);
+            }
+            winit::event::Event::Resumed => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::Resumed,
+                };
+                app.handle_event(app_event);
+                integration.paint_all(event_loop, control_flow, &mut app);
+            }
+            winit::event::Event::MainEventsCleared => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::MainEventsCleared,
+                };
+                app.handle_event(app_event);
+                integration.paint_all(event_loop, control_flow, &mut app);
+            }
+            winit::event::Event::RedrawRequested(window_id) => {
+                integration.paint(event_loop, control_flow, window_id, &mut app);
+            }
+            winit::event::Event::RedrawEventsCleared => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::RedrawEventsCleared,
+                };
+                app.handle_event(app_event);
+            }
+            winit::event::Event::LoopDestroyed => {
+                let app_event = event::Event::AppEvent {
+                    event: event::AppEvent::LoopDestroyed,
+                };
+                app.handle_event(app_event);
+                #[cfg(feature = "persistence")]
+                integration.save(&mut app);
+                integration.destroy();
+                unsafe {
+                    ManuallyDrop::drop(&mut integration);
+                }
             }
         }
     });

@@ -5,7 +5,7 @@ use ash::{
 };
 use egui_winit::winit;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::renderer::{EguiCommand, SwapchainUpdateInfo};
 use crate::utils;
@@ -14,7 +14,7 @@ struct Presenter {
     width: u32,
     height: u32,
 
-    device: Arc<Device>,
+    device: Device,
     surface: vk::SurfaceKHR,
     clear_color: [f32; 4],
 
@@ -64,7 +64,7 @@ impl Presenter {
         // select surface present mode
         let surface_present_mode = surface_present_modes
             .iter()
-            .find(|&&present_mode| present_mode == vk::PresentModeKHR::MAILBOX)
+            .find(|&&present_mode| present_mode == vk::PresentModeKHR::FIFO)
             .unwrap_or(&vk::PresentModeKHR::FIFO);
 
         // calculate extent
@@ -149,16 +149,14 @@ impl Presenter {
         let mut image_available_semaphores = vec![];
         for _ in 0..len {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore =
-                unsafe { device.create_semaphore(&semaphore_create_info, None)? };
-            image_available_semaphores.push(timeline_semaphore);
+            let semaphore = unsafe { device.create_semaphore(&semaphore_create_info, None)? };
+            image_available_semaphores.push(semaphore);
         }
         let mut render_finished_semaphores = vec![];
         for _ in 0..len {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore =
-                unsafe { device.create_semaphore(&semaphore_create_info, None)? };
-            render_finished_semaphores.push(timeline_semaphore);
+            let semaphore = unsafe { device.create_semaphore(&semaphore_create_info, None)? };
+            render_finished_semaphores.push(semaphore);
         }
 
         Ok((
@@ -172,7 +170,7 @@ impl Presenter {
         entry: &Entry,
         instance: &Instance,
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
+        device: Device,
         surface_loader: &Surface,
         swapchain_loader: &Swapchain,
         command_pool: vk::CommandPool,
@@ -556,12 +554,12 @@ impl Presenter {
 }
 
 pub struct Presenters {
-    entry: Arc<Entry>,
-    instance: Arc<Instance>,
+    entry: Entry,
+    instance: Instance,
     physical_device: vk::PhysicalDevice,
-    device: Arc<Device>,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    device: Device,
+    surface_loader: Surface,
+    swapchain_loader: Swapchain,
     queue: vk::Queue,
     command_pool: vk::CommandPool,
     presenters: HashMap<egui::ViewportId, Presenter>,
@@ -569,12 +567,12 @@ pub struct Presenters {
 }
 impl Presenters {
     pub(crate) fn new(
-        entry: Arc<Entry>,
-        instance: Arc<Instance>,
+        entry: Entry,
+        instance: Instance,
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
-        surface_loader: Arc<Surface>,
-        swapchain_loader: Arc<Swapchain>,
+        device: Device,
+        surface_loader: Surface,
+        swapchain_loader: Swapchain,
         queue: vk::Queue,
         command_pool: vk::CommandPool,
         clear_color: [f32; 4],

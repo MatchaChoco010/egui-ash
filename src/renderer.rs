@@ -35,17 +35,13 @@ struct ViewportRendererState<A: Allocator + 'static> {
 
 #[derive(Clone)]
 struct ViewportRenderer<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     descriptor_set_layout: vk::DescriptorSetLayout,
     allocator: A,
     state: Arc<Mutex<Option<ViewportRendererState<A>>>>,
 }
 impl<A: Allocator + 'static> ViewportRenderer<A> {
-    fn new(
-        device: Arc<Device>,
-        descriptor_set_layout: vk::DescriptorSetLayout,
-        allocator: A,
-    ) -> Self {
+    fn new(device: Device, descriptor_set_layout: vk::DescriptorSetLayout, allocator: A) -> Self {
         Self {
             device,
             descriptor_set_layout,
@@ -58,31 +54,35 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
         unsafe {
             device.create_render_pass(
                 &vk::RenderPassCreateInfo::builder()
-                    .attachments(&[vk::AttachmentDescription::builder()
-                        .format(surface_format)
-                        .samples(vk::SampleCountFlags::TYPE_1)
-                        .load_op(vk::AttachmentLoadOp::LOAD)
-                        .store_op(vk::AttachmentStoreOp::STORE)
-                        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-                        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-                        .initial_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                        .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                        .build()])
-                    .subpasses(&[vk::SubpassDescription::builder()
-                        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-                        .color_attachments(&[vk::AttachmentReference::builder()
-                            .attachment(0)
-                            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .build()])
-                        .build()])
-                    .dependencies(&[vk::SubpassDependency::builder()
-                        .src_subpass(vk::SUBPASS_EXTERNAL)
-                        .dst_subpass(0)
-                        .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-                        .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-                        .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-                        .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-                        .build()]),
+                    .attachments(std::slice::from_ref(
+                        &vk::AttachmentDescription::builder()
+                            .format(surface_format)
+                            .samples(vk::SampleCountFlags::TYPE_1)
+                            .load_op(vk::AttachmentLoadOp::LOAD)
+                            .store_op(vk::AttachmentStoreOp::STORE)
+                            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                            .initial_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR),
+                    ))
+                    .subpasses(std::slice::from_ref(
+                        &vk::SubpassDescription::builder()
+                            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+                            .color_attachments(std::slice::from_ref(
+                                &vk::AttachmentReference::builder()
+                                    .attachment(0)
+                                    .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+                            )),
+                    ))
+                    .dependencies(std::slice::from_ref(
+                        &vk::SubpassDependency::builder()
+                            .src_subpass(vk::SUBPASS_EXTERNAL)
+                            .dst_subpass(0)
+                            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+                            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT),
+                    )),
                 None,
             )
         }
@@ -185,69 +185,79 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
             .depth_bias_enable(false)
             .line_width(1.0);
-        let stencil_op = vk::StencilOpState::builder()
-            .fail_op(vk::StencilOp::KEEP)
-            .pass_op(vk::StencilOp::KEEP)
-            .compare_op(vk::CompareOp::ALWAYS)
-            .build();
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
             .depth_test_enable(false)
             .depth_write_enable(false)
             .depth_compare_op(vk::CompareOp::ALWAYS)
             .depth_bounds_test_enable(false)
             .stencil_test_enable(false)
-            .front(stencil_op)
-            .back(stencil_op);
+            .front(vk::StencilOpState {
+                compare_op: vk::CompareOp::ALWAYS,
+                fail_op: vk::StencilOp::KEEP,
+                pass_op: vk::StencilOp::KEEP,
+                ..Default::default()
+            })
+            .back(vk::StencilOpState {
+                compare_op: vk::CompareOp::ALWAYS,
+                fail_op: vk::StencilOp::KEEP,
+                pass_op: vk::StencilOp::KEEP,
+                ..Default::default()
+            });
         let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_states);
         let multisample_info = vk::PipelineMultisampleStateCreateInfo::builder()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 
-        let pipeline_create_info = [vk::GraphicsPipelineCreateInfo::builder()
-            .stages(&pipeline_shader_stages)
-            .vertex_input_state(
-                &vk::PipelineVertexInputStateCreateInfo::builder()
-                    .vertex_attribute_descriptions(&attributes)
-                    .vertex_binding_descriptions(std::slice::from_ref(
-                        &vk::VertexInputBindingDescription::builder()
-                            .binding(0)
-                            .input_rate(vk::VertexInputRate::VERTEX)
-                            .stride(
-                                4 * std::mem::size_of::<f32>() as u32
-                                    + 4 * std::mem::size_of::<u8>() as u32,
-                            ),
-                    )),
-            )
-            .input_assembly_state(&input_assembly_info)
-            .viewport_state(&viewport_info)
-            .rasterization_state(&rasterization_info)
-            .multisample_state(&multisample_info)
-            .depth_stencil_state(&depth_stencil_info)
-            .color_blend_state(
-                &vk::PipelineColorBlendStateCreateInfo::builder().attachments(
-                    std::slice::from_ref(
-                        &vk::PipelineColorBlendAttachmentState::builder()
-                            .color_write_mask(
-                                vk::ColorComponentFlags::R
-                                    | vk::ColorComponentFlags::G
-                                    | vk::ColorComponentFlags::B
-                                    | vk::ColorComponentFlags::A,
-                            )
-                            .blend_enable(true)
-                            .src_color_blend_factor(vk::BlendFactor::ONE)
-                            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA),
-                    ),
-                ),
-            )
-            .dynamic_state(&dynamic_state_info)
-            .layout(pipeline_layout)
-            .render_pass(render_pass)
-            .subpass(0)
-            .build()];
-
         let pipeline = unsafe {
-            device.create_graphics_pipelines(vk::PipelineCache::null(), &pipeline_create_info, None)
+            device.create_graphics_pipelines(
+                vk::PipelineCache::null(),
+                std::slice::from_ref(
+                    &vk::GraphicsPipelineCreateInfo::builder()
+                        .stages(&pipeline_shader_stages)
+                        .vertex_input_state(
+                            &vk::PipelineVertexInputStateCreateInfo::builder()
+                                .vertex_attribute_descriptions(&attributes)
+                                .vertex_binding_descriptions(std::slice::from_ref(
+                                    &vk::VertexInputBindingDescription::builder()
+                                        .binding(0)
+                                        .input_rate(vk::VertexInputRate::VERTEX)
+                                        .stride(
+                                            4 * std::mem::size_of::<f32>() as u32
+                                                + 4 * std::mem::size_of::<u8>() as u32,
+                                        ),
+                                )),
+                        )
+                        .input_assembly_state(&input_assembly_info)
+                        .viewport_state(&viewport_info)
+                        .rasterization_state(&rasterization_info)
+                        .multisample_state(&multisample_info)
+                        .depth_stencil_state(&depth_stencil_info)
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::builder().attachments(
+                                std::slice::from_ref(
+                                    &vk::PipelineColorBlendAttachmentState::builder()
+                                        .color_write_mask(
+                                            vk::ColorComponentFlags::R
+                                                | vk::ColorComponentFlags::G
+                                                | vk::ColorComponentFlags::B
+                                                | vk::ColorComponentFlags::A,
+                                        )
+                                        .blend_enable(true)
+                                        .src_color_blend_factor(vk::BlendFactor::ONE)
+                                        .dst_color_blend_factor(
+                                            vk::BlendFactor::ONE_MINUS_SRC_ALPHA,
+                                        ),
+                                ),
+                            ),
+                        )
+                        .dynamic_state(&dynamic_state_info)
+                        .layout(pipeline_layout)
+                        .render_pass(render_pass)
+                        .subpass(0),
+                ),
+                None,
+            )
         }
         .expect("Failed to create graphics pipeline.")[0];
         unsafe {
@@ -599,14 +609,15 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                         this.device.cmd_set_viewport(
                             cmd,
                             0,
-                            &[vk::Viewport::builder()
-                                .x(0.0)
-                                .y(0.0)
-                                .width(state.physical_width as f32)
-                                .height(state.physical_height as f32)
-                                .min_depth(0.0)
-                                .max_depth(1.0)
-                                .build()],
+                            std::slice::from_ref(
+                                &vk::Viewport::builder()
+                                    .x(0.0)
+                                    .y(0.0)
+                                    .width(state.physical_width as f32)
+                                    .height(state.physical_height as f32)
+                                    .min_depth(0.0)
+                                    .max_depth(1.0),
+                            ),
                         );
                         let width_points = state.physical_width as f32 / state.scale_factor as f32;
                         let height_points =
@@ -731,20 +742,17 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                             this.device.cmd_set_scissor(
                                 cmd,
                                 0,
-                                &[vk::Rect2D::builder()
-                                    .offset(
-                                        vk::Offset2D::builder()
-                                            .x(min.x.round() as i32)
-                                            .y(min.y.round() as i32)
-                                            .build(),
-                                    )
-                                    .extent(
-                                        vk::Extent2D::builder()
-                                            .width((max.x.round() - min.x) as u32)
-                                            .height((max.y.round() - min.y) as u32)
-                                            .build(),
-                                    )
-                                    .build()],
+                                std::slice::from_ref(
+                                    &vk::Rect2D::builder()
+                                        .offset(vk::Offset2D {
+                                            x: min.x.round() as i32,
+                                            y: min.y.round() as i32,
+                                        })
+                                        .extent(vk::Extent2D {
+                                            width: (max.x.round() - min.x) as u32,
+                                            height: (max.y.round() - min.y) as u32,
+                                        }),
+                                ),
                             );
                             this.device.cmd_draw_indexed(
                                 cmd,
@@ -813,7 +821,7 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
 }
 
 struct ManagedTextures<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     queue: vk::Queue,
     queue_family_index: u32,
     descriptor_pool: vk::DescriptorPool,
@@ -847,7 +855,7 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
     }
 
     fn new(
-        device: Arc<Device>,
+        device: Device,
         queue: vk::Queue,
         queue_family_index: u32,
         descriptor_pool: vk::DescriptorPool,
@@ -892,29 +900,33 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                 .collect(),
         };
         let cmd_pool = {
-            let cmd_pool_info = vk::CommandPoolCreateInfo::builder()
-                .queue_family_index(self.queue_family_index)
-                .build();
             unsafe {
                 self.device
-                    .create_command_pool(&cmd_pool_info, None)
+                    .create_command_pool(
+                        &vk::CommandPoolCreateInfo::builder()
+                            .queue_family_index(self.queue_family_index),
+                        None,
+                    )
                     .unwrap()
             }
         };
         let cmd = {
-            let cmd_buff_alloc_info = vk::CommandBufferAllocateInfo::builder()
-                .command_buffer_count(1u32)
-                .command_pool(cmd_pool)
-                .level(vk::CommandBufferLevel::PRIMARY)
-                .build();
             unsafe {
                 self.device
-                    .allocate_command_buffers(&cmd_buff_alloc_info)
+                    .allocate_command_buffers(
+                        &vk::CommandBufferAllocateInfo::builder()
+                            .command_buffer_count(1u32)
+                            .command_pool(cmd_pool)
+                            .level(vk::CommandBufferLevel::PRIMARY),
+                    )
                     .unwrap()[0]
             }
         };
-        let fence_info = vk::FenceCreateInfo::builder().build();
-        let cmd_fence = unsafe { self.device.create_fence(&fence_info, None).unwrap() };
+        let cmd_fence = unsafe {
+            self.device
+                .create_fence(&vk::FenceCreateInfo::builder(), None)
+                .unwrap()
+        };
 
         let (staging_buffer, staging_allocation) = {
             let buffer_size = data.len() as vk::DeviceSize;
@@ -950,24 +962,28 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                 height: delta.image.height() as u32,
                 depth: 1,
             };
-            let create_info = vk::ImageCreateInfo::builder()
-                .array_layers(1)
-                .extent(extent)
-                .flags(vk::ImageCreateFlags::empty())
-                .format(vk::Format::R8G8B8A8_UNORM)
-                .image_type(vk::ImageType::TYPE_2D)
-                .initial_layout(vk::ImageLayout::UNDEFINED)
-                .mip_levels(1)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .sharing_mode(vk::SharingMode::EXCLUSIVE)
-                .tiling(vk::ImageTiling::OPTIMAL)
-                .usage(
-                    vk::ImageUsageFlags::SAMPLED
-                        | vk::ImageUsageFlags::TRANSFER_DST
-                        | vk::ImageUsageFlags::TRANSFER_SRC,
+            let handle = unsafe {
+                self.device.create_image(
+                    &vk::ImageCreateInfo::builder()
+                        .array_layers(1)
+                        .extent(extent)
+                        .flags(vk::ImageCreateFlags::empty())
+                        .format(vk::Format::R8G8B8A8_UNORM)
+                        .image_type(vk::ImageType::TYPE_2D)
+                        .initial_layout(vk::ImageLayout::UNDEFINED)
+                        .mip_levels(1)
+                        .samples(vk::SampleCountFlags::TYPE_1)
+                        .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                        .tiling(vk::ImageTiling::OPTIMAL)
+                        .usage(
+                            vk::ImageUsageFlags::SAMPLED
+                                | vk::ImageUsageFlags::TRANSFER_DST
+                                | vk::ImageUsageFlags::TRANSFER_SRC,
+                        ),
+                    None,
                 )
-                .build();
-            let handle = unsafe { self.device.create_image(&create_info, None) }.unwrap();
+            }
+            .unwrap();
             let requirements = unsafe { self.device.get_image_memory_requirements(handle) };
             let allocation = self
                 .allocator
@@ -986,32 +1002,36 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
             (handle, allocation)
         };
         let texture_image_view = {
-            let create_info = vk::ImageViewCreateInfo::builder()
-                .components(vk::ComponentMapping::default())
-                .flags(vk::ImageViewCreateFlags::empty())
-                .format(vk::Format::R8G8B8A8_UNORM)
-                .image(texture_image)
-                .subresource_range(
-                    vk::ImageSubresourceRange::builder()
-                        .aspect_mask(vk::ImageAspectFlags::COLOR)
-                        .base_array_layer(0)
-                        .base_mip_level(0)
-                        .layer_count(1)
-                        .level_count(1)
-                        .build(),
-                )
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .build();
-            unsafe { self.device.create_image_view(&create_info, None).unwrap() }
+            unsafe {
+                self.device
+                    .create_image_view(
+                        &vk::ImageViewCreateInfo::builder()
+                            .components(vk::ComponentMapping::default())
+                            .flags(vk::ImageViewCreateFlags::empty())
+                            .format(vk::Format::R8G8B8A8_UNORM)
+                            .image(texture_image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: vk::ImageAspectFlags::COLOR,
+                                base_array_layer: 0,
+                                base_mip_level: 0,
+                                layer_count: 1,
+                                level_count: 1,
+                            })
+                            .view_type(vk::ImageViewType::TYPE_2D),
+                        None,
+                    )
+                    .unwrap()
+            }
         };
 
         // begin cmd
         unsafe {
-            let cmd_begin_info = vk::CommandBufferBeginInfo::builder()
-                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-                .build();
             self.device
-                .begin_command_buffer(cmd, &cmd_begin_info)
+                .begin_command_buffer(
+                    cmd,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
                 .unwrap();
         }
         // Transition texture image for transfer dst
@@ -1027,40 +1047,38 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::HOST,
             vk::PipelineStageFlags::TRANSFER,
-            vk::ImageSubresourceRange::builder()
-                .aspect_mask(vk::ImageAspectFlags::COLOR)
-                .base_array_layer(0u32)
-                .layer_count(1u32)
-                .base_mip_level(0u32)
-                .level_count(1u32)
-                .build(),
+            vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_array_layer: 0,
+                base_mip_level: 0,
+                layer_count: 1,
+                level_count: 1,
+            },
         );
-        let region = vk::BufferImageCopy::builder()
-            .buffer_offset(0)
-            .buffer_row_length(delta.image.width() as u32)
-            .buffer_image_height(delta.image.height() as u32)
-            .image_subresource(
-                vk::ImageSubresourceLayers::builder()
-                    .aspect_mask(vk::ImageAspectFlags::COLOR)
-                    .base_array_layer(0)
-                    .layer_count(1)
-                    .mip_level(0)
-                    .build(),
-            )
-            .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
-            .image_extent(vk::Extent3D {
-                width: delta.image.width() as u32,
-                height: delta.image.height() as u32,
-                depth: 1,
-            })
-            .build();
         unsafe {
             self.device.cmd_copy_buffer_to_image(
                 cmd,
                 staging_buffer,
                 texture_image,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &[region],
+                std::slice::from_ref(
+                    &vk::BufferImageCopy::builder()
+                        .buffer_offset(0)
+                        .buffer_row_length(delta.image.width() as u32)
+                        .buffer_image_height(delta.image.height() as u32)
+                        .image_subresource(vk::ImageSubresourceLayers {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                            mip_level: 0,
+                        })
+                        .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+                        .image_extent(vk::Extent3D {
+                            width: delta.image.width() as u32,
+                            height: delta.image.height() as u32,
+                            depth: 1,
+                        }),
+                ),
             );
         }
         utils::insert_image_memory_barrier(
@@ -1075,25 +1093,26 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
             vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             vk::PipelineStageFlags::TRANSFER,
             vk::PipelineStageFlags::VERTEX_SHADER,
-            vk::ImageSubresourceRange::builder()
-                .aspect_mask(vk::ImageAspectFlags::COLOR)
-                .base_array_layer(0u32)
-                .layer_count(1u32)
-                .base_mip_level(0u32)
-                .level_count(1u32)
-                .build(),
+            vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_array_layer: 0,
+                base_mip_level: 0,
+                layer_count: 1,
+                level_count: 1,
+            },
         );
 
         unsafe {
             self.device.end_command_buffer(cmd).unwrap();
         }
         let cmd_buffs = [cmd];
-        let submit_infos = [vk::SubmitInfo::builder()
-            .command_buffers(&cmd_buffs)
-            .build()];
         unsafe {
             self.device
-                .queue_submit(self.queue, &submit_infos, cmd_fence)
+                .queue_submit(
+                    self.queue,
+                    std::slice::from_ref(&vk::SubmitInfo::builder().command_buffers(&cmd_buffs)),
+                    cmd_fence,
+                )
                 .unwrap();
             self.device
                 .wait_for_fences(&[cmd_fence], true, u64::MAX)
@@ -1111,23 +1130,6 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                     height: delta.image.height() as u32,
                     depth: 1,
                 };
-                let info = vk::ImageCreateInfo::builder()
-                    .array_layers(1)
-                    .extent(extent)
-                    .flags(vk::ImageCreateFlags::empty())
-                    .format(vk::Format::R8G8B8A8_UNORM)
-                    .image_type(vk::ImageType::TYPE_2D)
-                    .initial_layout(vk::ImageLayout::UNDEFINED)
-                    .mip_levels(1)
-                    .samples(vk::SampleCountFlags::TYPE_1)
-                    .sharing_mode(vk::SharingMode::EXCLUSIVE)
-                    .tiling(vk::ImageTiling::OPTIMAL)
-                    .usage(
-                        vk::ImageUsageFlags::SAMPLED
-                            | vk::ImageUsageFlags::TRANSFER_DST
-                            | vk::ImageUsageFlags::TRANSFER_SRC,
-                    )
-                    .build();
                 unsafe {
                     self.device
                         .reset_command_pool(cmd_pool, vk::CommandPoolResetFlags::empty())
@@ -1135,11 +1137,12 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                     self.device.reset_fences(&[cmd_fence]).unwrap();
 
                     // begin cmd buff
-                    let cmd_buff_begin_info = vk::CommandBufferBeginInfo::builder()
-                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-                        .build();
                     self.device
-                        .begin_command_buffer(cmd, &cmd_buff_begin_info)
+                        .begin_command_buffer(
+                            cmd,
+                            &vk::CommandBufferBeginInfo::builder()
+                                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                        )
                         .unwrap();
 
                     // Transition existing image for transfer dst
@@ -1155,13 +1158,13 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                         vk::PipelineStageFlags::FRAGMENT_SHADER,
                         vk::PipelineStageFlags::TRANSFER,
-                        vk::ImageSubresourceRange::builder()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0u32)
-                            .layer_count(1u32)
-                            .base_mip_level(0u32)
-                            .level_count(1u32)
-                            .build(),
+                        vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
                     );
                     // Transition new image for transfer src
                     utils::insert_image_memory_barrier(
@@ -1176,13 +1179,13 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                         vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                         vk::PipelineStageFlags::FRAGMENT_SHADER,
                         vk::PipelineStageFlags::TRANSFER,
-                        vk::ImageSubresourceRange::builder()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0u32)
-                            .layer_count(1u32)
-                            .base_mip_level(0u32)
-                            .level_count(1u32)
-                            .build(),
+                        vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
                     );
                     let top_left = vk::Offset3D {
                         x: pos[0] as i32,
@@ -1205,9 +1208,9 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                         src_offsets: [
                             vk::Offset3D { x: 0, y: 0, z: 0 },
                             vk::Offset3D {
-                                x: info.extent.width as i32,
-                                y: info.extent.height as i32,
-                                z: info.extent.depth as i32,
+                                x: extent.width as i32,
+                                y: extent.height as i32,
+                                z: extent.depth as i32,
                             },
                         ],
                         dst_subresource: vk::ImageSubresourceLayers {
@@ -1241,21 +1244,24 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                         vk::PipelineStageFlags::TRANSFER,
                         vk::PipelineStageFlags::FRAGMENT_SHADER,
-                        vk::ImageSubresourceRange::builder()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0u32)
-                            .layer_count(1u32)
-                            .base_mip_level(0u32)
-                            .level_count(1u32)
-                            .build(),
+                        vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
                     );
                     self.device.end_command_buffer(cmd).unwrap();
                     let cmd_buffs = [cmd];
-                    let submit_infos = [vk::SubmitInfo::builder()
-                        .command_buffers(&cmd_buffs)
-                        .build()];
                     self.device
-                        .queue_submit(self.queue, &submit_infos, cmd_fence)
+                        .queue_submit(
+                            self.queue,
+                            std::slice::from_ref(
+                                &vk::SubmitInfo::builder().command_buffers(&cmd_buffs),
+                            ),
+                            cmd_fence,
+                        )
                         .unwrap();
                     self.device
                         .wait_for_fences(&[cmd_fence], true, u64::MAX)
@@ -1274,30 +1280,33 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
 
             // update dsc set
             let dsc_set = {
-                let dsc_alloc_info = vk::DescriptorSetAllocateInfo::builder()
-                    .descriptor_pool(self.descriptor_pool)
-                    .set_layouts(&[self.descriptor_set_layout])
-                    .build();
                 unsafe {
                     self.device
-                        .allocate_descriptor_sets(&dsc_alloc_info)
+                        .allocate_descriptor_sets(
+                            &vk::DescriptorSetAllocateInfo::builder()
+                                .descriptor_pool(self.descriptor_pool)
+                                .set_layouts(&[self.descriptor_set_layout]),
+                        )
                         .unwrap()[0]
                 }
             };
-            let image_info = vk::DescriptorImageInfo::builder()
-                .image_view(texture_image_view)
-                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                .sampler(self.sampler)
-                .build();
-            let dsc_writes = [vk::WriteDescriptorSet::builder()
-                .dst_set(dsc_set)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .dst_array_element(0_u32)
-                .dst_binding(0_u32)
-                .image_info(&[image_info])
-                .build()];
             unsafe {
-                self.device.update_descriptor_sets(&dsc_writes, &[]);
+                self.device.update_descriptor_sets(
+                    std::slice::from_ref(
+                        &vk::WriteDescriptorSet::builder()
+                            .dst_set(dsc_set)
+                            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                            .dst_array_element(0_u32)
+                            .dst_binding(0_u32)
+                            .image_info(std::slice::from_ref(
+                                &vk::DescriptorImageInfo::builder()
+                                    .image_view(texture_image_view)
+                                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                                    .sampler(self.sampler),
+                            )),
+                    ),
+                    &[],
+                );
             }
             // register new texture
             self.texture_images.insert(texture_id, texture_image);
@@ -1425,7 +1434,7 @@ pub(crate) enum RegistryCommand {
 }
 
 struct UserTextures {
-    device: Arc<Device>,
+    device: Device,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
     texture_desc_sets: HashMap<u64, vk::DescriptorSet>,
@@ -1433,7 +1442,7 @@ struct UserTextures {
 }
 impl UserTextures {
     fn new(
-        device: Arc<Device>,
+        device: Device,
         descriptor_pool: vk::DescriptorPool,
         descriptor_set_layout: vk::DescriptorSetLayout,
         receiver: ImageRegistryReceiver,
@@ -1451,34 +1460,37 @@ impl UserTextures {
 
     fn register_user_texture(&mut self, id: u64, image_view: vk::ImageView, sampler: vk::Sampler) {
         let dsc_set = {
-            let dsc_alloc_info = vk::DescriptorSetAllocateInfo::builder()
-                .descriptor_pool(self.descriptor_pool)
-                .set_layouts(&[self.descriptor_set_layout])
-                .build();
             unsafe {
                 self.texture_desc_sets.insert(
                     id,
                     self.device
-                        .allocate_descriptor_sets(&dsc_alloc_info)
+                        .allocate_descriptor_sets(
+                            &vk::DescriptorSetAllocateInfo::builder()
+                                .descriptor_pool(self.descriptor_pool)
+                                .set_layouts(&[self.descriptor_set_layout]),
+                        )
                         .expect("Failed to allocate descriptor set")[0],
                 );
             }
             self.texture_desc_sets.get(&id).unwrap()
         };
-        let image_info = vk::DescriptorImageInfo::builder()
-            .image_view(image_view)
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .sampler(sampler)
-            .build();
-        let dsc_writes = [vk::WriteDescriptorSet::builder()
-            .dst_set(*dsc_set)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .dst_array_element(0_u32)
-            .dst_binding(0_u32)
-            .image_info(&[image_info])
-            .build()];
         unsafe {
-            self.device.update_descriptor_sets(&dsc_writes, &[]);
+            self.device.update_descriptor_sets(
+                std::slice::from_ref(
+                    &vk::WriteDescriptorSet::builder()
+                        .dst_set(*dsc_set)
+                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                        .dst_array_element(0_u32)
+                        .dst_binding(0_u32)
+                        .image_info(std::slice::from_ref(
+                            &vk::DescriptorImageInfo::builder()
+                                .image_view(image_view)
+                                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                                .sampler(sampler),
+                        )),
+                ),
+                &[],
+            );
         }
     }
 
@@ -1521,7 +1533,7 @@ impl UserTextures {
 }
 
 pub(crate) struct Renderer<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
     allocator: A,
@@ -1565,7 +1577,7 @@ impl<A: Allocator + 'static> Renderer<A> {
     }
 
     pub(crate) fn new(
-        device: Arc<Device>,
+        device: Device,
         queue: vk::Queue,
         queue_family_index: u32,
         allocator: A,

@@ -468,7 +468,7 @@ impl<A: Allocator + 'static> Integration<A> {
                 if viewport.window.is_minimized() == Some(true) {
                     // On Mac, a minimized Window uses up all CPU:
                     // https://github.com/emilk/egui/issues/325
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    // std::thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
 
@@ -536,7 +536,6 @@ impl<A: Allocator + 'static> Integration<A> {
         if let Some(viewport) = viewports.get_mut(&viewport_id) {
             if viewport.is_first_frame {
                 viewport.is_first_frame = false;
-                control_flow.set_wait_until(Instant::now());
             } else {
                 viewport.window.set_visible(true);
             }

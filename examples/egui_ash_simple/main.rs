@@ -19,16 +19,13 @@ use std::{
 };
 
 struct MyApp {
-    entry: Arc<Entry>,
-    instance: Arc<Instance>,
-    device: Arc<Device>,
+    entry: Entry,
+    instance: Instance,
+    device: Device,
     debug_utils_loader: DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
-    physical_device: vk::PhysicalDevice,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    surface_loader: Surface,
     surface: vk::SurfaceKHR,
-    queue: vk::Queue,
     command_pool: vk::CommandPool,
     allocator: ManuallyDrop<Arc<Mutex<Allocator>>>,
 
@@ -450,16 +447,13 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
         cc.context.set_fonts(fonts);
 
         let app = MyApp {
-            entry: Arc::new(entry),
-            instance: Arc::new(instance),
-            device: Arc::new(device),
-            debug_utils_loader: debug_utils_loader,
+            entry,
+            instance,
+            device,
+            debug_utils_loader,
             debug_messenger,
-            physical_device,
-            surface_loader: Arc::new(surface_loader),
-            swapchain_loader: Arc::new(swapchain_loader),
+            surface_loader,
             surface,
-            queue,
             command_pool,
             allocator: ManuallyDrop::new(allocator.clone()),
 
@@ -471,16 +465,17 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
             text: String::from("Hello text!"),
             value: 0.0,
         };
+
         let ash_render_state = AshRenderState {
             entry: app.entry.clone(),
             instance: app.instance.clone(),
-            physical_device: app.physical_device,
+            physical_device,
             device: app.device.clone(),
             surface_loader: app.surface_loader.clone(),
-            swapchain_loader: app.swapchain_loader.clone(),
-            queue: app.queue,
+            swapchain_loader: swapchain_loader.clone(),
+            queue,
             queue_family_index,
-            command_pool: app.command_pool,
+            command_pool,
             allocator: allocator.clone(),
         };
 

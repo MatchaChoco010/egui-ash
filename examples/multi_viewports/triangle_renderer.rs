@@ -12,6 +12,21 @@ use std::{
     time::Instant,
 };
 
+macro_rules! include_spirv {
+    ($file:literal) => {{
+        let bytes = include_bytes!($file);
+        bytes
+            .chunks_exact(4)
+            .map(|x| x.try_into().unwrap())
+            .map(match bytes[0] {
+                0x03 => u32::from_le_bytes,
+                0x07 => u32::from_be_bytes,
+                _ => panic!("Unknown endianness"),
+            })
+            .collect::<Vec<u32>>()
+    }};
+}
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 struct Vertex {
@@ -378,9 +393,8 @@ impl TriangleRendererInner {
         render_pass: vk::RenderPass,
     ) -> (vk::Pipeline, vk::PipelineLayout) {
         let vertex_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/triangle.vert.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/triangle.vert.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
@@ -388,9 +402,8 @@ impl TriangleRendererInner {
             }
         };
         let fragment_shader_module = {
-            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(
-                bytemuck::cast_slice(include_bytes!("./shaders/spv/triangle.frag.spv")),
-            );
+            let spirv = include_spirv!("./shaders/spv/triangle.frag.spv");
+            let shader_module_create_info = vk::ShaderModuleCreateInfo::builder().code(&spirv);
             unsafe {
                 device
                     .create_shader_module(&shader_module_create_info, None)
@@ -677,22 +690,22 @@ impl TriangleRendererInner {
         let mut image_available_semaphores = vec![];
         for _ in 0..swapchain_count {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore = unsafe {
+            let semaphore = unsafe {
                 device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create semaphore")
             };
-            image_available_semaphores.push(timeline_semaphore);
+            image_available_semaphores.push(semaphore);
         }
         let mut render_finished_semaphores = vec![];
         for _ in 0..swapchain_count {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore = unsafe {
+            let semaphore = unsafe {
                 device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create semaphore")
             };
-            render_finished_semaphores.push(timeline_semaphore);
+            render_finished_semaphores.push(semaphore);
         }
         (
             in_flight_fences,
@@ -1096,7 +1109,7 @@ impl TriangleRendererInner {
             .wait_semaphores(std::slice::from_ref(
                 &self.image_available_semaphores[self.current_frame],
             ))
-            .wait_dst_stage_mask(&[vk::PipelineStageFlags::BOTTOM_OF_PIPE])
+            .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
             .signal_semaphores(std::slice::from_ref(
                 &self.render_finished_semaphores[self.current_frame],
             ));
