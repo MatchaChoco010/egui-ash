@@ -3,7 +3,7 @@ use ash::{
     vk, Device, Entry, Instance,
 };
 use egui_winit::winit;
-use std::{ffi::CString, sync::Arc};
+use std::ffi::CString;
 
 #[cfg(feature = "persistence")]
 use crate::storage;
@@ -81,12 +81,12 @@ pub struct CreationContext<'a> {
 /// vulkan objects required for drawing ash.
 /// You should return this struct from [`AppCreator::create()`].
 pub struct AshRenderState<A: Allocator + 'static> {
-    pub entry: Arc<Entry>,
-    pub instance: Arc<Instance>,
+    pub entry: Entry,
+    pub instance: Instance,
     pub physical_device: vk::PhysicalDevice,
-    pub device: Arc<Device>,
-    pub surface_loader: Arc<Surface>,
-    pub swapchain_loader: Arc<Swapchain>,
+    pub device: Device,
+    pub surface_loader: Surface,
+    pub swapchain_loader: Swapchain,
     pub queue: vk::Queue,
     pub queue_family_index: u32,
     pub command_pool: vk::CommandPool,

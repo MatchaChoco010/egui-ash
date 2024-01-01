@@ -310,6 +310,19 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
         // setup context
         cc.context.set_visuals(egui::style::Visuals::dark());
 
+        let ash_render_state = AshRenderState {
+            entry: entry.clone(),
+            instance: instance.clone(),
+            physical_device,
+            device: device.clone(),
+            surface_loader: surface_loader.clone(),
+            swapchain_loader: swapchain_loader.clone(),
+            queue,
+            queue_family_index,
+            command_pool,
+            allocator: allocator.clone(),
+        };
+
         let device = Arc::new(device);
         let surface_loader = Arc::new(surface_loader);
         let swapchain_loader = Arc::new(swapchain_loader);
@@ -355,18 +368,6 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
             rotate_y: Arc::new(Mutex::new(0.0)),
             show_immediate_viewport: false,
             show_deferred_viewport: Arc::new(Mutex::new(false)),
-        };
-        let ash_render_state = AshRenderState {
-            entry: app.entry.clone(),
-            instance: app.instance.clone(),
-            physical_device: app.physical_device,
-            device,
-            surface_loader,
-            swapchain_loader,
-            queue: app.queue,
-            queue_family_index,
-            command_pool: app.command_pool,
-            allocator: allocator.clone(),
         };
 
         (app, ash_render_state)

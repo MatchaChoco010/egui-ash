@@ -5,7 +5,7 @@ use ash::{
 };
 use egui_winit::winit;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::renderer::{EguiCommand, SwapchainUpdateInfo};
 use crate::utils;
@@ -14,7 +14,7 @@ struct Presenter {
     width: u32,
     height: u32,
 
-    device: Arc<Device>,
+    device: Device,
     surface: vk::SurfaceKHR,
     clear_color: [f32; 4],
 
@@ -170,7 +170,7 @@ impl Presenter {
         entry: &Entry,
         instance: &Instance,
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
+        device: Device,
         surface_loader: &Surface,
         swapchain_loader: &Swapchain,
         command_pool: vk::CommandPool,
@@ -554,12 +554,12 @@ impl Presenter {
 }
 
 pub struct Presenters {
-    entry: Arc<Entry>,
-    instance: Arc<Instance>,
+    entry: Entry,
+    instance: Instance,
     physical_device: vk::PhysicalDevice,
-    device: Arc<Device>,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    device: Device,
+    surface_loader: Surface,
+    swapchain_loader: Swapchain,
     queue: vk::Queue,
     command_pool: vk::CommandPool,
     presenters: HashMap<egui::ViewportId, Presenter>,
@@ -567,12 +567,12 @@ pub struct Presenters {
 }
 impl Presenters {
     pub(crate) fn new(
-        entry: Arc<Entry>,
-        instance: Arc<Instance>,
+        entry: Entry,
+        instance: Instance,
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
-        surface_loader: Arc<Surface>,
-        swapchain_loader: Arc<Swapchain>,
+        device: Device,
+        surface_loader: Surface,
+        swapchain_loader: Swapchain,
         queue: vk::Queue,
         command_pool: vk::CommandPool,
         clear_color: [f32; 4],

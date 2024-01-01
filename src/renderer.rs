@@ -35,17 +35,13 @@ struct ViewportRendererState<A: Allocator + 'static> {
 
 #[derive(Clone)]
 struct ViewportRenderer<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     descriptor_set_layout: vk::DescriptorSetLayout,
     allocator: A,
     state: Arc<Mutex<Option<ViewportRendererState<A>>>>,
 }
 impl<A: Allocator + 'static> ViewportRenderer<A> {
-    fn new(
-        device: Arc<Device>,
-        descriptor_set_layout: vk::DescriptorSetLayout,
-        allocator: A,
-    ) -> Self {
+    fn new(device: Device, descriptor_set_layout: vk::DescriptorSetLayout, allocator: A) -> Self {
         Self {
             device,
             descriptor_set_layout,
@@ -825,7 +821,7 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
 }
 
 struct ManagedTextures<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     queue: vk::Queue,
     queue_family_index: u32,
     descriptor_pool: vk::DescriptorPool,
@@ -859,7 +855,7 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
     }
 
     fn new(
-        device: Arc<Device>,
+        device: Device,
         queue: vk::Queue,
         queue_family_index: u32,
         descriptor_pool: vk::DescriptorPool,
@@ -1438,7 +1434,7 @@ pub(crate) enum RegistryCommand {
 }
 
 struct UserTextures {
-    device: Arc<Device>,
+    device: Device,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
     texture_desc_sets: HashMap<u64, vk::DescriptorSet>,
@@ -1446,7 +1442,7 @@ struct UserTextures {
 }
 impl UserTextures {
     fn new(
-        device: Arc<Device>,
+        device: Device,
         descriptor_pool: vk::DescriptorPool,
         descriptor_set_layout: vk::DescriptorSetLayout,
         receiver: ImageRegistryReceiver,
@@ -1537,7 +1533,7 @@ impl UserTextures {
 }
 
 pub(crate) struct Renderer<A: Allocator + 'static> {
-    device: Arc<Device>,
+    device: Device,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
     allocator: A,
@@ -1581,7 +1577,7 @@ impl<A: Allocator + 'static> Renderer<A> {
     }
 
     pub(crate) fn new(
-        device: Arc<Device>,
+        device: Device,
         queue: vk::Queue,
         queue_family_index: u32,
         allocator: A,

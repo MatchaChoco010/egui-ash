@@ -22,15 +22,13 @@ use tree_behavior::TreeBehavior;
 use vkutils::*;
 
 struct MyApp {
-    entry: Arc<Entry>,
+    _entry: Arc<Entry>,
     instance: Arc<Instance>,
     device: Arc<Device>,
     debug_utils_loader: DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
-    physical_device: vk::PhysicalDevice,
     surface_loader: Arc<Surface>,
     surface: vk::SurfaceKHR,
-    queue: vk::Queue,
     command_pool: vk::CommandPool,
     allocator: ManuallyDrop<Arc<Mutex<Allocator>>>,
 
@@ -115,9 +113,21 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
         // setup context
         cc.context.set_visuals(egui::style::Visuals::dark());
 
+        let ash_render_state = AshRenderState {
+            entry: entry.clone(),
+            instance: instance.clone(),
+            physical_device,
+            device: device.clone(),
+            surface_loader: surface_loader.clone(),
+            swapchain_loader,
+            queue,
+            queue_family_index,
+            command_pool,
+            allocator: allocator.clone(),
+        };
+
         let device = Arc::new(device);
         let surface_loader = Arc::new(surface_loader);
-        let swapchain_loader = Arc::new(swapchain_loader);
         let scene = Arc::new(Mutex::new(Scene::new()));
         let scene_view = SceneView::new(
             device.clone(),
@@ -129,33 +139,19 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
             scene.clone(),
         );
         let app = MyApp {
-            entry: Arc::new(entry),
+            _entry: Arc::new(entry),
             instance: Arc::new(instance),
             device: device.clone(),
             debug_utils_loader,
             debug_messenger,
-            physical_device,
             surface_loader: surface_loader.clone(),
             surface,
-            queue,
             command_pool,
             allocator: ManuallyDrop::new(allocator.clone()),
 
             scene_view: scene_view.clone(),
             tree: pane::Pane::create_tree(scene.clone(), scene_view.clone()),
             tree_behavior: TreeBehavior,
-        };
-        let ash_render_state = AshRenderState {
-            entry: app.entry.clone(),
-            instance: app.instance.clone(),
-            physical_device: app.physical_device,
-            device,
-            surface_loader,
-            swapchain_loader,
-            queue: app.queue,
-            queue_family_index,
-            command_pool: app.command_pool,
-            allocator: allocator.clone(),
         };
 
         (app, ash_render_state)

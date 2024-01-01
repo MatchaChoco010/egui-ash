@@ -21,14 +21,14 @@ mod renderer;
 use renderer::Renderer;
 
 struct MyApp {
-    entry: Arc<Entry>,
-    instance: Arc<Instance>,
-    device: Arc<Device>,
+    entry: Entry,
+    instance: Instance,
+    device: Device,
     debug_utils_loader: DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
     physical_device: vk::PhysicalDevice,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    surface_loader: Surface,
+    swapchain_loader: Swapchain,
     surface: vk::SurfaceKHR,
     queue: vk::Queue,
     command_pool: vk::CommandPool,
@@ -448,12 +448,9 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
         // setup context
         cc.context.set_visuals(egui::style::Visuals::dark());
 
-        let device = Arc::new(device);
-        let surface_loader = Arc::new(surface_loader);
-        let swapchain_loader = Arc::new(swapchain_loader);
         let app = MyApp {
-            entry: Arc::new(entry),
-            instance: Arc::new(instance),
+            entry,
+            instance,
             device: device.clone(),
             debug_utils_loader,
             debug_messenger,
@@ -467,9 +464,9 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
 
             renderer: Renderer::new(
                 physical_device,
-                device.clone(),
-                surface_loader.clone(),
-                swapchain_loader.clone(),
+                device,
+                surface_loader,
+                swapchain_loader,
                 allocator.clone(),
                 surface,
                 queue_family_index,
@@ -491,7 +488,7 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
             entry: app.entry.clone(),
             instance: app.instance.clone(),
             physical_device: app.physical_device,
-            device,
+            device: app.device.clone(),
             surface_loader: app.surface_loader.clone(),
             swapchain_loader: app.swapchain_loader.clone(),
             queue: app.queue,

@@ -72,9 +72,9 @@ struct RendererInner {
     height: u32,
 
     physical_device: vk::PhysicalDevice,
-    device: Arc<Device>,
-    surface_loader: Arc<Surface>,
-    swapchain_loader: Arc<Swapchain>,
+    device: Device,
+    surface_loader: Surface,
+    swapchain_loader: Swapchain,
     allocator: ManuallyDrop<Arc<Mutex<Allocator>>>,
     surface: vk::SurfaceKHR,
     queue: vk::Queue,
@@ -976,9 +976,9 @@ impl RendererInner {
 
     fn new(
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
-        surface_loader: Arc<Surface>,
-        swapchain_loader: Arc<Swapchain>,
+        device: Device,
+        surface_loader: Surface,
+        swapchain_loader: Swapchain,
         allocator: Arc<Mutex<Allocator>>,
         surface: vk::SurfaceKHR,
         queue_family_index: u32,
@@ -1235,7 +1235,7 @@ impl RendererInner {
             .wait_semaphores(std::slice::from_ref(
                 &self.image_available_semaphores[self.current_frame],
             ))
-            .wait_dst_stage_mask(&[vk::PipelineStageFlags::BOTTOM_OF_PIPE])
+            .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
             .signal_semaphores(std::slice::from_ref(
                 &self.render_finished_semaphores[self.current_frame],
             ));
@@ -1337,9 +1337,9 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(
         physical_device: vk::PhysicalDevice,
-        device: Arc<Device>,
-        surface_loader: Arc<Surface>,
-        swapchain_loader: Arc<Swapchain>,
+        device: Device,
+        surface_loader: Surface,
+        swapchain_loader: Swapchain,
         allocator: Arc<Mutex<Allocator>>,
         surface: vk::SurfaceKHR,
         queue_family_index: u32,
