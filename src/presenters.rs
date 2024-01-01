@@ -64,7 +64,7 @@ impl Presenter {
         // select surface present mode
         let surface_present_mode = surface_present_modes
             .iter()
-            .find(|&&present_mode| present_mode == vk::PresentModeKHR::MAILBOX)
+            .find(|&&present_mode| present_mode == vk::PresentModeKHR::FIFO)
             .unwrap_or(&vk::PresentModeKHR::FIFO);
 
         // calculate extent
