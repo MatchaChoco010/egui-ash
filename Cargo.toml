@@ -1,6 +1,6 @@
 [package]
 name = "egui-ash"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["ORITO Itsuki <orito.itsuki@gmail.com>"]
 description = "egui integration for ash (Vulkan)."
 edition = "2021"
@@ -60,7 +60,7 @@ ash = { version = "0.37.3", default-features = false, features = ["linked", "deb
 egui_extras = { version = "0.24.2", features = ["all_loaders"] }
 egui-ash = { path = ".", features = ["gpu-allocator", "persistence"] }
 egui_tiles = "0.4.0"
-glam = "0.24.2"
+glam = "0.25.0"
 image = { version = "0.24.7", default-features = false, features = ["png", "jpeg", "bmp"] }
 log = "0.4.20"
 tobj = "4.0.0"
