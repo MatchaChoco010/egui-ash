@@ -149,16 +149,14 @@ impl Presenter {
         let mut image_available_semaphores = vec![];
         for _ in 0..len {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore =
-                unsafe { device.create_semaphore(&semaphore_create_info, None)? };
-            image_available_semaphores.push(timeline_semaphore);
+            let semaphore = unsafe { device.create_semaphore(&semaphore_create_info, None)? };
+            image_available_semaphores.push(semaphore);
         }
         let mut render_finished_semaphores = vec![];
         for _ in 0..len {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore =
-                unsafe { device.create_semaphore(&semaphore_create_info, None)? };
-            render_finished_semaphores.push(timeline_semaphore);
+            let semaphore = unsafe { device.create_semaphore(&semaphore_create_info, None)? };
+            render_finished_semaphores.push(semaphore);
         }
 
         Ok((

@@ -801,22 +801,22 @@ impl RendererInner {
         let mut image_available_semaphores = vec![];
         for _ in 0..swapchain_count {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore = unsafe {
+            let semaphore = unsafe {
                 device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create semaphore")
             };
-            image_available_semaphores.push(timeline_semaphore);
+            image_available_semaphores.push(semaphore);
         }
         let mut render_finished_semaphores = vec![];
         for _ in 0..swapchain_count {
             let semaphore_create_info = vk::SemaphoreCreateInfo::builder();
-            let timeline_semaphore = unsafe {
+            let semaphore = unsafe {
                 device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create semaphore")
             };
-            render_finished_semaphores.push(timeline_semaphore);
+            render_finished_semaphores.push(semaphore);
         }
         (
             in_flight_fences,
