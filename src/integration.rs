@@ -86,6 +86,7 @@ impl<A: Allocator + 'static> Integration<A> {
         main_window: winit::window::Window,
         render_state: AshRenderState<A>,
         clear_color: [f32; 4],
+        present_mode: ash::vk::PresentModeKHR,
         receiver: ImageRegistryReceiver,
         #[cfg(feature = "persistence")] storage: Storage,
         #[cfg(feature = "persistence")] persistent_windows: bool,
@@ -101,6 +102,7 @@ impl<A: Allocator + 'static> Integration<A> {
             render_state.queue,
             render_state.command_pool,
             clear_color,
+            present_mode,
         )));
         let renderer = Renderer::new(
             render_state.device.clone(),

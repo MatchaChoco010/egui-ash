@@ -27,6 +27,8 @@ pub struct RunOption {
     pub persistent_windows: bool,
     #[cfg(feature = "persistence")]
     pub persistent_egui_memory: bool,
+    /// vk::PresentModeKHR
+    pub present_mode: ash::vk::PresentModeKHR,
 }
 impl Default for RunOption {
     fn default() -> Self {
@@ -39,6 +41,7 @@ impl Default for RunOption {
             persistent_windows: true,
             #[cfg(feature = "persistence")]
             persistent_egui_memory: true,
+            present_mode: ash::vk::PresentModeKHR::FIFO,
         }
     }
 }
@@ -163,6 +166,7 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
         main_window,
         render_state,
         run_option.clear_color,
+        run_option.present_mode,
         image_registry_receiver,
         #[cfg(feature = "persistence")]
         storage,

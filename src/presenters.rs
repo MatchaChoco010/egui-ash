@@ -17,6 +17,7 @@ struct Presenter {
     device: Device,
     surface: vk::SurfaceKHR,
     clear_color: [f32; 4],
+    present_mode: vk::PresentModeKHR,
 
     swapchain: vk::SwapchainKHR,
     swapchain_images: Vec<vk::Image>,
@@ -40,6 +41,7 @@ impl Presenter {
         surface: vk::SurfaceKHR,
         surface_loader: &Surface,
         swapchain_loader: &Swapchain,
+        present_mode: vk::PresentModeKHR,
     ) -> Result<(vk::SwapchainKHR, Vec<vk::Image>, vk::Format, vk::Extent2D)> {
         let surface_capabilities = unsafe {
             surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
@@ -64,7 +66,7 @@ impl Presenter {
         // select surface present mode
         let surface_present_mode = surface_present_modes
             .iter()
-            .find(|&&present_mode| present_mode == vk::PresentModeKHR::FIFO)
+            .find(|&&mode| mode == present_mode)
             .unwrap_or(&vk::PresentModeKHR::FIFO);
 
         // calculate extent
@@ -176,6 +178,7 @@ impl Presenter {
         command_pool: vk::CommandPool,
         window: &winit::window::Window,
         clear_color: [f32; 4],
+        present_mode: vk::PresentModeKHR,
     ) -> Option<Self> {
         let width = window.inner_size().width;
         let height = window.inner_size().height;
@@ -206,6 +209,7 @@ impl Presenter {
                 surface,
                 surface_loader,
                 swapchain_loader,
+                present_mode,
             )
             .expect("Failed to create swapchain");
 
@@ -229,6 +233,7 @@ impl Presenter {
             device,
             surface,
             clear_color,
+            present_mode,
 
             swapchain,
             swapchain_images,
@@ -296,6 +301,7 @@ impl Presenter {
                 self.surface,
                 surface_loader,
                 swapchain_loader,
+                self.present_mode,
             )
             .expect("Failed to create swapchain");
 
@@ -564,6 +570,7 @@ pub struct Presenters {
     command_pool: vk::CommandPool,
     presenters: HashMap<egui::ViewportId, Presenter>,
     clear_color: [f32; 4],
+    present_mode: vk::PresentModeKHR,
 }
 impl Presenters {
     pub(crate) fn new(
@@ -576,6 +583,7 @@ impl Presenters {
         queue: vk::Queue,
         command_pool: vk::CommandPool,
         clear_color: [f32; 4],
+        present_mode: vk::PresentModeKHR,
     ) -> Self {
         Self {
             entry,
@@ -588,6 +596,7 @@ impl Presenters {
             command_pool,
             presenters: HashMap::new(),
             clear_color,
+            present_mode,
         }
     }
 
@@ -626,6 +635,7 @@ impl Presenters {
                 self.command_pool,
                 window,
                 self.clear_color,
+                self.present_mode,
             ) {
                 self.presenters.insert(viewport_id, presenter);
             }
