@@ -8,6 +8,9 @@
 ### Fixed
 - fix error in unregister_user_texture.
 
+### Update
+- update gpu-allocator from 0.24.0 to 0.25.0.
+
 ## [0.2.0] - 2024-01-01
 ### Changed
 - remove Arc from AshRenderState.
