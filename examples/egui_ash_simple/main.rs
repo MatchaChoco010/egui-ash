@@ -8,7 +8,7 @@ use ash::{
 use egui::FontData;
 use egui_ash::{
     raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle},
-    winit, App, AppCreator, AshRenderState, CreationContext, RunOption, Theme,
+    winit, App, AppCreator, AshRenderState, CreationContext, ExitSignal, RunOption, Theme,
 };
 use gpu_allocator::vulkan::*;
 use std::{
@@ -32,9 +32,15 @@ struct MyApp {
     theme: Theme,
     text: String,
     value: f32,
+    exit_signal: ExitSignal,
 }
 impl App for MyApp {
     fn ui(&mut self, ctx: &egui::Context) {
+        let esc_press = ctx.input(|i| i.key_down(egui::Key::Escape));
+        if esc_press {
+            self.exit_signal.send(0);
+        }
+
         egui::CentralPanel::default().show(&ctx, |ui| {
             ui.heading("Hello");
             ui.label("Hello egui!");
@@ -61,6 +67,7 @@ impl App for MyApp {
             ui.add(egui::widgets::Slider::new(&mut self.value, -10.0..=10.0));
             ui.separator();
             ui.text_edit_singleline(&mut self.text);
+            ui.label("You can close the application with the ESC key.");
 
             egui::Window::new("My Window")
                 .id(egui::Id::new("my_window"))
@@ -92,6 +99,7 @@ impl App for MyApp {
                     ui.add(egui::widgets::Slider::new(&mut self.value, -10.0..=10.0));
                     ui.separator();
                     ui.text_edit_singleline(&mut self.text);
+                    ui.label("You can close the application with the ESC key.");
                 });
         });
 
@@ -464,6 +472,7 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
             },
             text: String::from("Hello text!"),
             value: 0.0,
+            exit_signal: cc.exit_signal,
         };
 
         let ash_render_state = AshRenderState {

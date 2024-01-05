@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.3.0] - 2024-01-05
+### Added
+- add exit_signal API to close exit app in code.
+- add ability to change `vk::PresentModeKHR`.
+
+### Fixed
+- fix error in unregister_user_texture.
+
 ## [0.2.0] - 2024-01-01
 ### Changed
 - remove Arc from AshRenderState.

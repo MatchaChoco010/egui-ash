@@ -1498,6 +1498,9 @@ impl UserTextures {
         if let Some(desc_set) = self.texture_desc_sets.remove(&id) {
             unsafe {
                 self.device
+                    .device_wait_idle()
+                    .expect("Failed to wait device idle");
+                self.device
                     .free_descriptor_sets(self.descriptor_pool, &[desc_set])
                     .expect("Failed to free descriptor set.");
             }
