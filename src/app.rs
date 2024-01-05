@@ -10,7 +10,7 @@ use crate::storage;
 use crate::{
     event,
     renderer::{EguiCommand, ImageRegistry},
-    Allocator,
+    Allocator, ExitSignal,
 };
 
 /// egui theme type.
@@ -76,6 +76,9 @@ pub struct CreationContext<'a> {
 
     /// user texture image registry for egui-ash
     pub image_registry: ImageRegistry,
+
+    /// exit signal sender
+    pub exit_signal: ExitSignal,
 }
 
 /// vulkan objects required for drawing ash.

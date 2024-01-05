@@ -43,6 +43,18 @@ impl Default for RunOption {
     }
 }
 
+/// exit signal sender for exit app.
+#[derive(Debug, Clone)]
+pub struct ExitSignal {
+    tx: std::sync::mpsc::Sender<i32>,
+}
+impl ExitSignal {
+    /// send exit signal.
+    pub fn send(&self, exit_code: i32) {
+        self.tx.send(exit_code).unwrap();
+    }
+}
+
 ///egui-ash run function.
 ///
 /// ```
@@ -129,12 +141,16 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
 
     let (image_registry, image_registry_receiver) = ImageRegistry::new();
 
+    let (exit_signal_tx, exit_signal_rx) = std::sync::mpsc::channel();
+    let exit_signal = ExitSignal { tx: exit_signal_tx };
+
     let cc = CreationContext {
         main_window: &main_window,
         context: context.clone(),
         required_instance_extensions: instance_extensions,
         required_device_extensions: device_extensions.into_iter().collect(),
         image_registry,
+        exit_signal,
     };
     let (mut app, render_state) = creator.create(cc);
 
@@ -158,6 +174,10 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
 
     event_loop.run(move |event, event_loop, control_flow| {
         control_flow.set_poll();
+        if let Some(exit_code) = exit_signal_rx.try_recv().ok() {
+            control_flow.set_exit_with_code(exit_code);
+            return;
+        }
         match event {
             winit::event::Event::NewEvents(start_cause) => {
                 let app_event = event::Event::AppEvent {
@@ -245,5 +265,5 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
                 }
             }
         }
-    });
+    })
 }
