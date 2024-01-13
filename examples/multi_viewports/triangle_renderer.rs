@@ -943,7 +943,11 @@ impl TriangleRendererInner {
             return;
         }
 
-        if self.dirty_swapchain || width != self.width || height != self.height {
+        if self.dirty_swapchain
+            || width != self.width
+            || height != self.height
+            || egui_cmd.swapchain_recreate_required()
+        {
             self.recreate_swapchain(width, height, &mut egui_cmd);
         }
 

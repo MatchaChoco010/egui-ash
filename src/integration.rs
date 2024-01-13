@@ -428,7 +428,7 @@ impl<A: Allocator + 'static> Integration<A> {
                     viewport.ids.this,
                     clipped_primitives,
                     textures_delta,
-                    viewport.window.scale_factor() as f32,
+                    self.context.zoom_factor(),
                     viewport.window.inner_size(),
                 );
 
@@ -864,7 +864,7 @@ fn immediate_viewport_renderer(
             viewport.ids.this,
             clipped_primitives,
             textures_delta,
-            viewport.window.scale_factor() as f32,
+            ctx.zoom_factor(),
             viewport.window.inner_size(),
         );
 
