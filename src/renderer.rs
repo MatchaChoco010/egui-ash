@@ -820,6 +820,9 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                 for framebuffer in state.framebuffers.drain(..) {
                     self.device.destroy_framebuffer(framebuffer, None);
                 }
+                for image_view in state.swapchain_image_views.drain(..) {
+                    self.device.destroy_image_view(image_view, None);
+                }
                 self.device.destroy_pipeline(state.pipeline, None);
                 self.device
                     .destroy_pipeline_layout(state.pipeline_layout, None);
@@ -1315,6 +1318,17 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                     ),
                     &[],
                 );
+            }
+            // destroy old texture
+            if let Some((_, image)) = self.texture_images.remove_entry(&texture_id) {
+                unsafe {
+                    self.device.destroy_image(image, None);
+                }
+            }
+            if let Some((_, image_view)) = self.texture_image_views.remove_entry(&texture_id) {
+                unsafe {
+                    self.device.destroy_image_view(image_view, None);
+                }
             }
             // register new texture
             self.texture_images.insert(texture_id, texture_image);
