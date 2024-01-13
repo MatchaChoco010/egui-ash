@@ -374,7 +374,7 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
     }
 }
 
-fn main() {
+fn main() -> std::process::ExitCode {
     egui_ash::run(
         "egui-ash-multi-viewports",
         MyAppCreator,

@@ -6,9 +6,9 @@ pub enum AppEvent {
     NewEvents(winit::event::StartCause),
     Suspended,
     Resumed,
-    MainEventsCleared,
-    RedrawEventsCleared,
-    LoopDestroyed,
+    AboutToWait,
+    LoopExiting,
+    MemoryWarning,
 }
 
 pub enum Event<'a> {
@@ -18,7 +18,7 @@ pub enum Event<'a> {
     },
     ViewportEvent {
         viewport_id: egui::ViewportId,
-        event: winit::event::WindowEvent<'a>,
+        event: winit::event::WindowEvent,
     },
     AppEvent {
         event: AppEvent,
