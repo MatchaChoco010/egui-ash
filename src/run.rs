@@ -54,11 +54,11 @@ impl Default for RunOption {
 /// exit signal sender for exit app.
 #[derive(Debug, Clone)]
 pub struct ExitSignal {
-    tx: std::sync::mpsc::Sender<i32>,
+    tx: std::sync::mpsc::Sender<ExitCode>,
 }
 impl ExitSignal {
     /// send exit signal.
-    pub fn send(&self, exit_code: i32) {
+    pub fn send(&self, exit_code: ExitCode) {
         self.tx.send(exit_code).unwrap();
     }
 }
@@ -189,7 +189,7 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
         .run(move |event, event_loop| {
             event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
             if let Some(code) = exit_signal_rx.try_recv().ok() {
-                *exit_code_clone.lock().unwrap() = ExitCode::from(code as u8);
+                *exit_code_clone.lock().unwrap() = code;
                 event_loop.exit();
                 return;
             }

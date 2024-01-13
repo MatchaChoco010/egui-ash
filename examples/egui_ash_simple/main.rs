@@ -15,6 +15,7 @@ use std::{
     collections::HashSet,
     ffi::CString,
     mem::ManuallyDrop,
+    process::ExitCode,
     sync::{Arc, Mutex},
 };
 
@@ -38,7 +39,7 @@ impl App for MyApp {
     fn ui(&mut self, ctx: &egui::Context) {
         let esc_press = ctx.input(|i| i.key_down(egui::Key::Escape));
         if esc_press {
-            self.exit_signal.send(0);
+            self.exit_signal.send(ExitCode::SUCCESS);
         }
 
         egui::CentralPanel::default().show(&ctx, |ui| {
@@ -492,7 +493,7 @@ impl AppCreator<Arc<Mutex<Allocator>>> for MyAppCreator {
     }
 }
 
-fn main() -> std::process::ExitCode {
+fn main() -> ExitCode {
     egui_ash::run(
         "egui-ash-simple",
         MyAppCreator,
