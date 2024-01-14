@@ -68,6 +68,10 @@ pub struct CreationContext<'a> {
     /// egui context
     pub context: egui::Context,
 
+    /// storage to allow restoration of app state
+    #[cfg(feature = "persistence")]
+    pub storage: &'a storage::Storage,
+    
     /// required instance extensions for ash vulkan
     pub required_instance_extensions: Vec<CString>,
 
