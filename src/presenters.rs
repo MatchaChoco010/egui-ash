@@ -458,7 +458,7 @@ impl Presenter {
         }
 
         // update swapchain
-        if self.dirty_flag {
+        if self.dirty_flag || egui_cmd.swapchain_recreate_required() {
             let swapchain_update_info = SwapchainUpdateInfo {
                 width: self.width,
                 height: self.height,

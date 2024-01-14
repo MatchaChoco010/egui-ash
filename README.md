@@ -174,11 +174,15 @@ fn main() {
 
 [Full example is in examples directory](https://github.com/MatchaChoco010/egui-ash/tree/main/examples)
 
-# Feature flags
+## Feature flags
 
-- `gpu-allocator` - Enables the gpu-allocator crate.
-- `persistence` - Enables the persistence feature of egui.
+### `gpu-allocator` - Enables the gpu-allocator crate.
+This feature allows `Arc<Mutex<gpu_allocator::vulkan::Allocator>>` to be used as an allocator to be used by egui-ash.
 
+### `persistence` - Enables the persistence feature of egui.
+With this feature, setting `persistent_windows` and `persistent_egui_memory` in RunOption to `true` will preserve Window size and position, as well as scale factor, etc.
+
+### other features
 The other features directly control the underlying [egui_winit features](https://docs.rs/egui-winit/latest/egui_winit/)
 
 ## License

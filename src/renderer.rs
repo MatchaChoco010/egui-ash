@@ -520,6 +520,15 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
         physical_size: winit::dpi::PhysicalSize<u32>,
     ) -> EguiCommand {
         EguiCommand {
+            swapchain_recreate_required: {
+                let this = self.clone();
+                let state = this.state.lock().unwrap();
+                if let Some(state) = &*state {
+                    state.scale_factor != scale_factor
+                } else {
+                    false
+                }
+            },
             swapchain_updater: Some(Box::new({
                 let mut this = self.clone();
                 move |swapchain_update_info| {
@@ -606,22 +615,8 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                             0,
                             vk::IndexType::UINT32,
                         );
-                        this.device.cmd_set_viewport(
-                            cmd,
-                            0,
-                            std::slice::from_ref(
-                                &vk::Viewport::builder()
-                                    .x(0.0)
-                                    .y(0.0)
-                                    .width(state.physical_width as f32)
-                                    .height(state.physical_height as f32)
-                                    .min_depth(0.0)
-                                    .max_depth(1.0),
-                            ),
-                        );
-                        let width_points = state.physical_width as f32 / state.scale_factor as f32;
-                        let height_points =
-                            state.physical_height as f32 / state.scale_factor as f32;
+                        let width_points = state.physical_width as f32 / state.scale_factor;
+                        let height_points = state.physical_height as f32 / state.scale_factor;
                         this.device.cmd_push_constants(
                             cmd,
                             state.pipeline_layout,
@@ -754,6 +749,19 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                                         }),
                                 ),
                             );
+                            this.device.cmd_set_viewport(
+                                cmd,
+                                0,
+                                std::slice::from_ref(
+                                    &vk::Viewport::builder()
+                                        .x(0.0)
+                                        .y(0.0)
+                                        .width(state.physical_width as f32)
+                                        .height(state.physical_height as f32)
+                                        .min_depth(0.0)
+                                        .max_depth(1.0),
+                                ),
+                            );
                             this.device.cmd_draw_indexed(
                                 cmd,
                                 mesh.indices.len() as u32,
@@ -811,6 +819,9 @@ impl<A: Allocator + 'static> ViewportRenderer<A> {
                 }
                 for framebuffer in state.framebuffers.drain(..) {
                     self.device.destroy_framebuffer(framebuffer, None);
+                }
+                for image_view in state.swapchain_image_views.drain(..) {
+                    self.device.destroy_image_view(image_view, None);
                 }
                 self.device.destroy_pipeline(state.pipeline, None);
                 self.device
@@ -1308,6 +1319,17 @@ impl<A: Allocator + 'static> ManagedTextures<A> {
                     &[],
                 );
             }
+            // destroy old texture
+            if let Some((_, image)) = self.texture_images.remove_entry(&texture_id) {
+                unsafe {
+                    self.device.destroy_image(image, None);
+                }
+            }
+            if let Some((_, image_view)) = self.texture_image_views.remove_entry(&texture_id) {
+                unsafe {
+                    self.device.destroy_image_view(image_view, None);
+                }
+            }
             // register new texture
             self.texture_images.insert(texture_id, texture_image);
             self.texture_allocations
@@ -1694,6 +1716,7 @@ pub struct SwapchainUpdateInfo {
 pub struct EguiCommand {
     swapchain_updater: Option<Box<dyn FnOnce(SwapchainUpdateInfo) + Send>>,
     recorder: Box<dyn FnOnce(vk::CommandBuffer, usize) + Send>,
+    swapchain_recreate_required: bool,
 }
 impl EguiCommand {
     /// You must call this method once when first time to record commands
@@ -1708,12 +1731,18 @@ impl EguiCommand {
     pub fn record(self, cmd: vk::CommandBuffer, swapchain_index: usize) {
         (self.recorder)(cmd, swapchain_index);
     }
+
+    /// Returns whether swapchain recreation is required.
+    pub fn swapchain_recreate_required(&self) -> bool {
+        self.swapchain_recreate_required
+    }
 }
 impl Default for EguiCommand {
     fn default() -> Self {
         Self {
             swapchain_updater: None,
             recorder: Box::new(|_, _| {}),
+            swapchain_recreate_required: false,
         }
     }
 }

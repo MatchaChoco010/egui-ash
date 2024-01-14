@@ -76,7 +76,7 @@ pub(crate) struct Integration<A: Allocator + 'static> {
     #[cfg(feature = "persistence")]
     persistent_egui_memory: bool,
     #[cfg(feature = "persistence")]
-    last_auto_save: Option<Instant>,
+    last_auto_save: Instant,
 }
 impl<A: Allocator + 'static> Integration<A> {
     pub(crate) fn new(
@@ -114,6 +114,15 @@ impl<A: Allocator + 'static> Integration<A> {
 
         let main_window_id = main_window.id();
 
+        #[cfg(feature = "persistence")]
+        restore_main_window(
+            event_loop,
+            &context,
+            &main_window,
+            &storage,
+            persistent_windows,
+        );
+
         // use native window viewports
         context.set_embed_viewports(false);
 
@@ -126,6 +135,7 @@ impl<A: Allocator + 'static> Integration<A> {
         let max_texture_side = limits.max_image_dimension2_d as usize;
 
         let root_state = egui_winit::State::new(
+            context.clone(),
             egui::ViewportId::ROOT,
             &event_loop,
             Some(main_window.scale_factor() as f32),
@@ -205,7 +215,7 @@ impl<A: Allocator + 'static> Integration<A> {
             #[cfg(feature = "persistence")]
             persistent_egui_memory,
             #[cfg(feature = "persistence")]
-            last_auto_save: None,
+            last_auto_save: Instant::now(),
         }
     }
 
@@ -232,56 +242,71 @@ impl<A: Allocator + 'static> Integration<A> {
         &mut self,
         window_id: winit::window::WindowId,
         window_event: &winit::event::WindowEvent,
-        control_flow: &mut winit::event_loop::ControlFlow,
+        event_loop: &EventLoopWindowTarget<IntegrationEvent>,
         follow_system_theme: bool,
+        app: &mut impl crate::App,
     ) -> bool {
-        let window_id_to_viewport_id = self.window_id_to_viewport_id.lock().unwrap();
-        let Some(&viewport_id) = window_id_to_viewport_id.get(&window_id) else {
-            return false;
-        };
+        let event_response = {
+            let window_id_to_viewport_id = self.window_id_to_viewport_id.lock().unwrap();
+            let Some(&viewport_id) = window_id_to_viewport_id.get(&window_id) else {
+                return false;
+            };
 
-        let mut viewports = self.viewports.lock().unwrap();
-        let Some(viewport) = viewports.get_mut(&viewport_id) else {
-            return false;
+            let mut viewports = self.viewports.lock().unwrap();
+            let Some(viewport) = viewports.get_mut(&viewport_id) else {
+                return false;
+            };
+
+            match window_event {
+                winit::event::WindowEvent::ThemeChanged(theme) => {
+                    if follow_system_theme {
+                        viewport.window.set_theme(Some(theme.clone()));
+                    }
+                }
+                winit::event::WindowEvent::Focused(focused) => {
+                    if *focused {
+                        *self.focused_viewport.lock().unwrap() = Some(viewport_id);
+                    } else {
+                        *self.focused_viewport.lock().unwrap() = None;
+                    }
+                }
+                winit::event::WindowEvent::Resized(_) => {
+                    let mut presenters = self.presenters.lock().unwrap();
+                    presenters.dirty_swapchain(viewport_id);
+                }
+                winit::event::WindowEvent::ScaleFactorChanged { .. } => {
+                    let mut presenters = self.presenters.lock().unwrap();
+                    presenters.dirty_swapchain(viewport_id);
+                }
+                winit::event::WindowEvent::CloseRequested => {
+                    if viewport_id == egui::ViewportId::ROOT {
+                        event_loop.exit();
+                    }
+
+                    viewport.info.events.push(egui::ViewportEvent::Close);
+                    self.context.request_repaint_of(viewport.ids.parent);
+                }
+                _ => {}
+            }
+
+            let event_response = viewport
+                .state
+                .on_window_event(&viewport.window, &window_event);
+
+            if event_response.repaint {
+                viewport.window.request_redraw();
+            }
+
+            event_response
         };
 
         match window_event {
-            winit::event::WindowEvent::ThemeChanged(theme) => {
-                if follow_system_theme {
-                    viewport.window.set_theme(Some(theme.clone()));
-                }
-            }
-            winit::event::WindowEvent::Focused(focused) => {
-                if *focused {
-                    *self.focused_viewport.lock().unwrap() = Some(viewport_id);
-                } else {
-                    *self.focused_viewport.lock().unwrap() = None;
-                }
-            }
-            winit::event::WindowEvent::Resized(_) => {
-                let mut presenters = self.presenters.lock().unwrap();
-                presenters.dirty_swapchain(viewport_id);
-            }
-            winit::event::WindowEvent::ScaleFactorChanged { .. } => {
-                let mut presenters = self.presenters.lock().unwrap();
-                presenters.dirty_swapchain(viewport_id);
-            }
-            winit::event::WindowEvent::CloseRequested => {
-                if viewport_id == egui::ViewportId::ROOT {
-                    *control_flow = winit::event_loop::ControlFlow::Exit;
-                }
-
-                viewport.info.events.push(egui::ViewportEvent::Close);
-                self.context.request_repaint_of(viewport.ids.parent);
+            winit::event::WindowEvent::RedrawRequested => {
+                self.paint(event_loop, window_id, app);
             }
             _ => {}
         }
 
-        let event_response = viewport.state.on_window_event(&self.context, &window_event);
-
-        if event_response.repaint {
-            viewport.window.request_redraw();
-        }
         event_response.consumed
     }
 
@@ -401,11 +426,9 @@ impl<A: Allocator + 'static> Integration<A> {
             let egui_cmd = if let Some(viewport) = viewports.get_mut(&viewport_id) {
                 viewport.info.events.clear();
 
-                viewport.state.handle_platform_output(
-                    &viewport.window,
-                    &self.context,
-                    platform_output,
-                );
+                viewport
+                    .state
+                    .handle_platform_output(&viewport.window, platform_output);
 
                 let mut renderer = self.renderer.lock().unwrap();
 
@@ -414,7 +437,7 @@ impl<A: Allocator + 'static> Integration<A> {
                     viewport.ids.this,
                     clipped_primitives,
                     textures_delta,
-                    viewport.window.scale_factor() as f32,
+                    self.context.zoom_factor(),
                     viewport.window.inner_size(),
                 );
 
@@ -504,7 +527,6 @@ impl<A: Allocator + 'static> Integration<A> {
     pub(crate) fn paint(
         &mut self,
         event_loop: &EventLoopWindowTarget<IntegrationEvent>,
-        control_flow: &mut winit::event_loop::ControlFlow,
         window_id: winit::window::WindowId,
         app: &mut impl crate::App,
     ) {
@@ -545,14 +567,13 @@ impl<A: Allocator + 'static> Integration<A> {
 
         match paint_result {
             PaintResult::Wait => (),
-            PaintResult::Exit => *control_flow = winit::event_loop::ControlFlow::Exit,
+            PaintResult::Exit => event_loop.exit(),
         }
     }
 
     pub(crate) fn paint_all(
         &mut self,
         event_loop: &EventLoopWindowTarget<IntegrationEvent>,
-        control_flow: &mut winit::event_loop::ControlFlow,
         app: &mut impl crate::App,
     ) {
         let window_ids = {
@@ -560,20 +581,18 @@ impl<A: Allocator + 'static> Integration<A> {
             window_id_to_viewport_id.keys().copied().collect::<Vec<_>>()
         };
         for window_id in window_ids {
-            self.paint(event_loop, control_flow, window_id, app);
+            self.paint(event_loop, window_id, app);
         }
     }
 
     fn maybe_autosave(&mut self, _app: &mut impl crate::App) {
         #[cfg(feature = "persistence")]
         {
-            if let Some(last_auto_save) = self.last_auto_save {
-                if last_auto_save.elapsed() < _app.auto_save_interval() {
-                    return;
-                }
+            if self.last_auto_save.elapsed() < _app.auto_save_interval() {
+                return;
             }
             self.save(_app);
-            self.last_auto_save = Some(Instant::now());
+            self.last_auto_save = Instant::now();
         }
     }
 
@@ -646,6 +665,7 @@ fn initialize_or_update_viewport<'vp>(
                 persistent_windows,
             );
             let state = egui_winit::State::new(
+                context.clone(),
                 ids.this,
                 event_loop,
                 Some(window.scale_factor() as f32),
@@ -691,6 +711,7 @@ fn initialize_or_update_viewport<'vp>(
                     persistent_windows,
                 );
                 viewport.state = egui_winit::State::new(
+                    context.clone(),
                     ids.this,
                     event_loop,
                     Some(viewport.window.scale_factor() as f32),
@@ -755,6 +776,34 @@ fn create_viewport_window(
     window_id_to_viewport_id.insert(window.id(), viewport_id);
 
     window
+}
+
+#[cfg(feature = "persistence")]
+fn restore_main_window(
+    event_loop: &EventLoopWindowTarget<IntegrationEvent>,
+    context: &egui::Context,
+    main_window: &winit::window::Window,
+    storage: &Storage,
+    persistent_windows: bool,
+) {
+    if persistent_windows {
+        let window_settings = storage
+            .get_windows()
+            .and_then(|windows| windows.get(&egui::ViewportId::ROOT).map(|s| s.to_owned()))
+            .map(|mut settings| {
+                let egui_zoom_factor = context.zoom_factor();
+                settings.clamp_size_to_sane_values(utils::largest_monitor_point_size(
+                    egui_zoom_factor,
+                    event_loop,
+                ));
+                settings.clamp_position_to_monitors(egui_zoom_factor, event_loop);
+                settings.to_owned()
+            });
+
+        if let Some(window_settings) = window_settings {
+            window_settings.initialize_window(main_window);
+        }
+    }
 }
 
 fn immediate_viewport_renderer(
@@ -843,14 +892,14 @@ fn immediate_viewport_renderer(
 
         viewport
             .state
-            .handle_platform_output(&viewport.window, ctx, platform_output);
+            .handle_platform_output(&viewport.window, platform_output);
 
         let clipped_primitives = ctx.tessellate(shapes, pixels_per_point);
         let egui_cmd = renderer.create_egui_cmd(
             viewport.ids.this,
             clipped_primitives,
             textures_delta,
-            viewport.window.scale_factor() as f32,
+            ctx.zoom_factor(),
             viewport.window.inner_size(),
         );
 
