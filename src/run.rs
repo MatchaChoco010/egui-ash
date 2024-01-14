@@ -131,6 +131,8 @@ pub fn run<C: AppCreator<A> + 'static, A: Allocator + 'static>(
 
     let cc = CreationContext {
         main_window: &main_window,
+        #[cfg(feature = "persistence")]
+        storage: &storage,
         context: context.clone(),
         required_instance_extensions: instance_extensions,
         required_device_extensions: device_extensions.into_iter().collect(),
