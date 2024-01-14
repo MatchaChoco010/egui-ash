@@ -76,7 +76,7 @@ pub(crate) struct Integration<A: Allocator + 'static> {
     #[cfg(feature = "persistence")]
     persistent_egui_memory: bool,
     #[cfg(feature = "persistence")]
-    last_auto_save: Option<Instant>,
+    last_auto_save: Instant,
 }
 impl<A: Allocator + 'static> Integration<A> {
     pub(crate) fn new(
@@ -113,6 +113,15 @@ impl<A: Allocator + 'static> Integration<A> {
         );
 
         let main_window_id = main_window.id();
+
+        #[cfg(feature = "persistence")]
+        restore_main_window(
+            event_loop,
+            &context,
+            &main_window,
+            &storage,
+            persistent_windows,
+        );
 
         // use native window viewports
         context.set_embed_viewports(false);
@@ -206,7 +215,7 @@ impl<A: Allocator + 'static> Integration<A> {
             #[cfg(feature = "persistence")]
             persistent_egui_memory,
             #[cfg(feature = "persistence")]
-            last_auto_save: None,
+            last_auto_save: Instant::now(),
         }
     }
 
@@ -579,13 +588,11 @@ impl<A: Allocator + 'static> Integration<A> {
     fn maybe_autosave(&mut self, _app: &mut impl crate::App) {
         #[cfg(feature = "persistence")]
         {
-            if let Some(last_auto_save) = self.last_auto_save {
-                if last_auto_save.elapsed() < _app.auto_save_interval() {
-                    return;
-                }
+            if self.last_auto_save.elapsed() < _app.auto_save_interval() {
+                return;
             }
             self.save(_app);
-            self.last_auto_save = Some(Instant::now());
+            self.last_auto_save = Instant::now();
         }
     }
 
@@ -769,6 +776,34 @@ fn create_viewport_window(
     window_id_to_viewport_id.insert(window.id(), viewport_id);
 
     window
+}
+
+#[cfg(feature = "persistence")]
+fn restore_main_window(
+    event_loop: &EventLoopWindowTarget<IntegrationEvent>,
+    context: &egui::Context,
+    main_window: &winit::window::Window,
+    storage: &Storage,
+    persistent_windows: bool,
+) {
+    if persistent_windows {
+        let window_settings = storage
+            .get_windows()
+            .and_then(|windows| windows.get(&egui::ViewportId::ROOT).map(|s| s.to_owned()))
+            .map(|mut settings| {
+                let egui_zoom_factor = context.zoom_factor();
+                settings.clamp_size_to_sane_values(utils::largest_monitor_point_size(
+                    egui_zoom_factor,
+                    event_loop,
+                ));
+                settings.clamp_position_to_monitors(egui_zoom_factor, event_loop);
+                settings.to_owned()
+            });
+
+        if let Some(window_settings) = window_settings {
+            window_settings.initialize_window(main_window);
+        }
+    }
 }
 
 fn immediate_viewport_renderer(
