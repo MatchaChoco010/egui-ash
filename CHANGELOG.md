@@ -1,5 +1,22 @@
 # Change Log
 
+## [0.4.0] - 2024-01-14
+### Added
+- `egui_cmd.swapchain_recreate_required()` for change scale factor etc.
+
+### Changed
+- exit signal now receive `std::process::ExitCode`.
+
+### Fixed
+- fix error for ui zoom.
+- fix error by forgetting to destroy image and image view when zoom factor changes.
+- fix now restore main window position and size when `persistent_windows` is `true`.
+  - Note: there is currently a bug in egui itself in saving the scale factor and window position. https://github.com/emilk/egui/issues/3797
+
+### Update
+- update egui from 0.24.2 to 0.25.0.
+- update egui-winit from 0.24.1 to 0.25.0.
+
 ## [0.3.0] - 2024-01-05
 ### Added
 - add exit_signal API to close exit app in code.
